@@ -24,7 +24,8 @@ struct client_ctx {
     uuid_t uuid;
     ev_io io;
     struct sockaddr_in client_addr;
-    time_t connected_at;    
+    time_t connected_at;
+    
 };
 
 struct server_ctx {
@@ -70,7 +71,7 @@ int config_socket() {
     const short port = 9000;
     struct sockaddr_in sa;
     memset(&sa, 0, sizeof (sa));
-    sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    sa.sin_addr.s_addr = htonl(INADDR_ANY);
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
     if (bind(sock, (struct sockaddr *) &sa, sizeof (struct sockaddr_in)) == -1) {
@@ -106,7 +107,7 @@ struct client_ctx* get_unused_client_ctx(struct server_ctx *srv_ctx) {
 }
 
 static void client_read(struct ev_loop *loop, struct ev_io *io, int revents) {
-    
+    printf("client read");
 }
 
 static void on_connect(struct ev_loop *loop, struct ev_io *io, int revents) {
@@ -123,7 +124,7 @@ static void on_connect(struct ev_loop *loop, struct ev_io *io, int revents) {
             memcpy(&cli_ctx->client_addr, &client_addr, sizeof(struct sockaddr_in));
             ev_io_init(&cli_ctx->io, client_read, client_sock, EV_READ);
             ev_io_start(loop, &cli_ctx->io);          
-            char time_buff[64];
+            char time_buff[32];
             strftime(time_buff, sizeof(time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&cli_ctx->connected_at));
             char *addr = inet_ntoa(cli_ctx->client_addr.sin_addr);
             char uuid_buff[37];
@@ -143,10 +144,23 @@ static void on_connect(struct ev_loop *loop, struct ev_io *io, int revents) {
     }
 }
 
-int init_server_socket_ev(int sock, struct ev_loop *loop) {
-
-
-    return 0;
+struct ev_loop *init_server_context(int sock) {
+    struct ev_loop *loop = ev_default_loop(EVFLAG_AUTO);
+    if (!loop)
+        return NULL;
+    struct server_ctx *srv_ctx = (struct server_ctx *)calloc(1, sizeof(struct server_ctx));
+    srv_ctx->started_at = time(NULL);
+    srv_ctx->clients_size = 64;
+    srv_ctx->clients = (struct client_ctx *)calloc(srv_ctx->clients_size, sizeof(struct client_ctx));
+    char time_buff[32];
+    strftime(time_buff, sizeof(time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&srv_ctx->started_at));
+    printf("server started at %s\n", &time_buff);
+    
+    ev_io_init(&srv_ctx->ss_io, on_connect, sock, EV_READ);
+    ev_io_start(loop, &srv_ctx->ss_io);
+    ev_set_userdata(loop, (void*)srv_ctx);
+    
+    return loop;
 }
 
 int main(int argc, char** argv) {
@@ -154,23 +168,13 @@ int main(int argc, char** argv) {
     if ((sock = config_socket()) == -1) {
         return (EXIT_FAILURE);
     }
-    
-    struct server_ctx *srv_ctx = (struct server_ctx *)calloc(1, sizeof(struct server_ctx));
-    srv_ctx->started_at = time(NULL);
-    srv_ctx->clients_size = 1;
-    srv_ctx->clients = (struct client_ctx *)calloc(srv_ctx->clients_size, sizeof(struct client_ctx));
-    char time_buff[64];
-    strftime(time_buff, sizeof(time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&srv_ctx->started_at));
-    printf("server started at %s\n", &time_buff);
-    
-    struct ev_loop *loop = ev_default_loop(EVFLAG_AUTO);
-    ev_io_init(&srv_ctx->ss_io, on_connect, sock, EV_READ);
-    ev_io_start(loop, &srv_ctx->ss_io);
-    ev_set_userdata(loop, (void*)srv_ctx);
-        
+  
+    struct ev_loop *loop = init_server_context(sock); 
+    if (!loop) {
+        fprintf(stderr, "failed to initialize event loop and server context");
+    }
     ev_loop(loop, 0);
-    
-    
+      
     return (EXIT_SUCCESS);
 }
 
