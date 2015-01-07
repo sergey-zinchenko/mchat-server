@@ -38,6 +38,7 @@
         <linkerTool>
           <linkerLibItems>
             <linkerOptionItem>-lev</linkerOptionItem>
+            <linkerOptionItem>-luuid</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>
@@ -66,6 +67,7 @@
         <linkerTool>
           <linkerLibItems>
             <linkerOptionItem>-lev</linkerOptionItem>
+            <linkerOptionItem>-luuid</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>

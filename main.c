@@ -17,15 +17,23 @@
 #include <ev.h>
 #include <errno.h>
 #include <time.h>
+#include <uuid/uuid.h>
 
 
-struct client_ctx{
+struct client_ctx {
+    uuid_t uuid;
     ev_io io;
-    struct sockaddr_in clinet_addr;
-    time_t connected_at;
-}; 
- 
+    struct sockaddr_in client_addr;
+    time_t connected_at;    
+};
 
+struct server_ctx {
+    ev_io ss_io;
+    struct client_ctx *clients;
+    int clients_size;
+    int clients_count;
+    time_t started_at;
+};
 
 /* Prepare a server socket  
  Returns -1 for error, or configured socket otherwise.  */
@@ -48,12 +56,12 @@ int config_socket() {
 
     long fl = fcntl(sock, F_GETFL);
     if (fl == -1) {
-        fprintf(stderr, "can't get the socket access mode\n");
+        fprintf(stderr, "can't get the socket mode\n");
         close(sock);
         return -1;
     }
     if (fcntl(sock, F_SETFL, fl | O_NONBLOCK) == -1) {
-        fprintf(stderr, "can't set the socket access mode O_NONBLOCK\n");
+        fprintf(stderr, "can't set the socket mode O_NONBLOCK\n");
         close(sock);
         return -1;
     }
@@ -82,15 +90,45 @@ int config_socket() {
     return sock;
 }
 
-static void on_connect(EV_P_ struct ev_io *io, int revents) {
+struct client_ctx* get_unused_client_ctx(struct server_ctx *srv_ctx) {
+    if (srv_ctx->clients_count == srv_ctx->clients_size) {
+        struct client_ctx *reallocated = realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof(struct client_ctx));
+        if (!reallocated) {
+            fprintf(stderr, "failed to reallocate client list");
+            return NULL;
+        }
+        srv_ctx->clients = reallocated;
+        srv_ctx->clients_size += 64;
+        return &srv_ctx->clients[(srv_ctx->clients_count)++];
+    } else {
+        return &srv_ctx->clients[(srv_ctx->clients_count)++];
+    }
+}
+
+static void client_read(struct ev_loop *loop, struct ev_io *io, int revents) {
+    
+}
+
+static void on_connect(struct ev_loop *loop, struct ev_io *io, int revents) {
     while (1) {
-        struct sockaddr_in clinet_addr;
+        struct sockaddr_in client_addr;
         socklen_t len = sizeof (struct sockaddr_in);
-        int client = accept(io->fd, (struct sockaddr *)&clinet_addr, &len);
-        if (client >= 0) {
-            char *addr = inet_ntoa(clinet_addr.sin_addr);
-            printf("client accepted %s:%hu\n", addr, clinet_addr.sin_port);
-            
+        int client_sock = accept(io->fd, (struct sockaddr *)&client_addr, &len);
+        if (client_sock >= 0) {
+            struct server_ctx *srv_ctx =  (struct server_ctx *) ev_userdata(loop);
+            struct client_ctx* cli_ctx = get_unused_client_ctx(srv_ctx);
+            memset(cli_ctx, 0, sizeof (struct client_ctx));
+            cli_ctx->connected_at = time(NULL);
+            uuid_generate(cli_ctx->uuid);
+            memcpy(&cli_ctx->client_addr, &client_addr, sizeof(struct sockaddr_in));
+            ev_io_init(&cli_ctx->io, client_read, client_sock, EV_READ);
+            ev_io_start(loop, &cli_ctx->io);          
+            char time_buff[64];
+            strftime(time_buff, sizeof(time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&cli_ctx->connected_at));
+            char *addr = inet_ntoa(cli_ctx->client_addr.sin_addr);
+            char uuid_buff[37];
+            uuid_unparse_lower(cli_ctx->uuid, &uuid_buff);
+            printf("client accepted %s:%hu %s at %s\n", addr, client_addr.sin_port, &uuid_buff, &time_buff);            
         } else {
             if (errno == EAGAIN)
                 return;
@@ -116,19 +154,23 @@ int main(int argc, char** argv) {
     if ((sock = config_socket()) == -1) {
         return (EXIT_FAILURE);
     }
-
+    
+    struct server_ctx *srv_ctx = (struct server_ctx *)calloc(1, sizeof(struct server_ctx));
+    srv_ctx->started_at = time(NULL);
+    srv_ctx->clients_size = 1;
+    srv_ctx->clients = (struct client_ctx *)calloc(srv_ctx->clients_size, sizeof(struct client_ctx));
+    char time_buff[64];
+    strftime(time_buff, sizeof(time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&srv_ctx->started_at));
+    printf("server started at %s\n", &time_buff);
+    
     struct ev_loop *loop = ev_default_loop(EVFLAG_AUTO);
-
-    ev_io mc_io;
-    memset(&mc_io, 0, sizeof (ev_io));
-    ev_io_init(&mc_io, on_connect, sock, EV_READ);
-    ev_io_start(loop, &mc_io);
-
-    //    if (init_server_socket_ev(sock, loop) == -1) {
-    //        return (EXIT_FAILURE);
-    //    }
+    ev_io_init(&srv_ctx->ss_io, on_connect, sock, EV_READ);
+    ev_io_start(loop, &srv_ctx->ss_io);
+    ev_set_userdata(loop, (void*)srv_ctx);
+        
     ev_loop(loop, 0);
-
+    
+    
     return (EXIT_SUCCESS);
 }
 
