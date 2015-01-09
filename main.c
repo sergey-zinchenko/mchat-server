@@ -1,6 +1,6 @@
 /* 
  * File:   main.c
- * Author: user
+ * Author: Sergey Zinchenko
  *
  * Created on January 7, 2015, 6:23 PM
  */
@@ -19,20 +19,47 @@
 #include <time.h>
 #include <uuid/uuid.h>
 
+struct client_ctx;
+
+struct io_with_cctx {
+    ev_io io;
+    struct client_ctx *ctx;
+};
+
+typedef enum {
+    RS_WAIT_MESSAGE, RS_READ_MESSAGE
+} reader_state_t;
+
+struct read_ctx {
+    char *read_buff;
+    ssize_t read_buff_length, read_buff_pos, parser_pos, prev_parser_pos;
+    reader_state_t state;
+};
+
+struct message_to_write {
+    char *write_buff;
+    ssize_t write_buf_length, write_buff_pos;
+};
+
+struct write_ctx {
+    struct message_to_write *buffs;
+    ssize_t buffs_cout, buffs_length;
+};
 
 struct client_ctx {
     uuid_t uuid;
-    ev_io io;
+    struct io_with_cctx io;
     struct sockaddr_in client_addr;
     time_t connected_at;
-    
+    struct write_ctx w_ctx;
+    struct read_ctx r_ctx;
 };
 
 struct server_ctx {
     ev_io ss_io;
     struct client_ctx *clients;
-    int clients_size;
-    int clients_count;
+    ssize_t clients_size;
+    ssize_t clients_count;
     time_t started_at;
 };
 
@@ -93,7 +120,7 @@ int config_socket() {
 
 struct client_ctx* get_unused_client_ctx(struct server_ctx *srv_ctx) {
     if (srv_ctx->clients_count == srv_ctx->clients_size) {
-        struct client_ctx *reallocated = realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof(struct client_ctx));
+        struct client_ctx *reallocated = realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof (struct client_ctx));
         if (!reallocated) {
             fprintf(stderr, "failed to reallocate client list");
             return NULL;
@@ -106,30 +133,107 @@ struct client_ctx* get_unused_client_ctx(struct server_ctx *srv_ctx) {
     }
 }
 
-static void client_read(struct ev_loop *loop, struct ev_io *io, int revents) {
-    printf("client read");
+static void client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, struct client_ctx *cli_ctx, char *msg, ssize_t msg_len) {
+    char* buff = (char *)malloc(msg_len + 1);
+    memcpy(buff, msg, msg_len);
+    buff[msg_len] = 0;
+    printf("%s", buff);
+}
+
+static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revents) {
+    struct server_ctx *srv_ctx = (struct server_ctx *) ev_userdata(loop);
+    struct client_ctx *cli_ctx = (struct client_ctx *) (((struct io_with_cctx*) io)->ctx);
+    if (revents & EV_READ) {
+        while (1) {
+            if (cli_ctx->r_ctx.read_buff_length == cli_ctx->r_ctx.read_buff_pos) {
+                char *new_buff = realloc(cli_ctx->r_ctx.read_buff, cli_ctx->r_ctx.read_buff_length + 512);
+                if (!new_buff)
+                    break;
+                cli_ctx->r_ctx.read_buff = new_buff;
+                cli_ctx->r_ctx.read_buff_length += 512;
+            }
+            ssize_t readed = read(io->fd, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.read_buff_pos], cli_ctx->r_ctx.read_buff_length - cli_ctx->r_ctx.read_buff_pos);
+            if (readed > 0) {
+                cli_ctx->r_ctx.read_buff_pos += readed;
+                for (; cli_ctx->r_ctx.parser_pos < cli_ctx->r_ctx.read_buff_pos - 1; cli_ctx->r_ctx.parser_pos++) {
+                    if ((cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos] == 'q')&&(cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos + 1] == 'w')) {
+                        if (cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos > 0)
+                            client_message(loop, srv_ctx, cli_ctx, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.prev_parser_pos], cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos);
+                        cli_ctx->r_ctx.parser_pos++;
+                        cli_ctx->r_ctx.prev_parser_pos = cli_ctx->r_ctx.parser_pos + 1;
+                    }
+                }
+
+               
+
+            } else if (readed < 0) {
+                if (errno == EAGAIN)
+                    break;
+                if (errno == EINTR)
+                    continue;
+                return;
+            } else {
+                break;
+            }
+        }
+    }
+    if (revents & EV_WRITE) {
+
+    }
 }
 
 static void on_connect(struct ev_loop *loop, struct ev_io *io, int revents) {
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t len = sizeof (struct sockaddr_in);
-        int client_sock = accept(io->fd, (struct sockaddr *)&client_addr, &len);
+        int client_sock = accept(io->fd, (struct sockaddr *) &client_addr, &len);
         if (client_sock >= 0) {
-            struct server_ctx *srv_ctx =  (struct server_ctx *) ev_userdata(loop);
+
+            long fl = fcntl(client_sock, F_GETFL);
+            if (fl == -1) {
+                fprintf(stderr, "can't get the socket mode for client\n");
+                shutdown(client_sock, SHUT_RDWR);
+                close(client_sock);
+                return;
+            }
+            if (fcntl(client_sock, F_SETFL, fl | O_NONBLOCK) == -1) {
+                fprintf(stderr, "can't set the socket mode O_NONBLOCK for client\n");
+                shutdown(client_sock, SHUT_RDWR);
+                close(client_sock);
+                return;
+            }
+            struct linger l = {0, 0};
+            if (setsockopt(client_sock, SOL_SOCKET, SO_LINGER, &l, sizeof (l)) == -1) {
+                fprintf(stderr, "can't set SO_LINGER sock option for client\n");
+                shutdown(client_sock, SHUT_RDWR);
+                close(client_sock);
+                return;
+            }
+            int keep_alive = 1;
+            if (setsockopt(client_sock, SOL_SOCKET, SO_KEEPALIVE, &keep_alive, sizeof (keep_alive)) == -1) {
+                fprintf(stderr, "can't set SO_KEEPALIVE sock option for client\n");
+                shutdown(client_sock, SHUT_RDWR);
+                close(client_sock);
+                return;
+            }
+
+            struct server_ctx *srv_ctx = (struct server_ctx *) ev_userdata(loop);
             struct client_ctx* cli_ctx = get_unused_client_ctx(srv_ctx);
             memset(cli_ctx, 0, sizeof (struct client_ctx));
+            cli_ctx->io.ctx = cli_ctx;
+            cli_ctx->r_ctx.state = RS_WAIT_MESSAGE;
             cli_ctx->connected_at = time(NULL);
             uuid_generate(cli_ctx->uuid);
-            memcpy(&cli_ctx->client_addr, &client_addr, sizeof(struct sockaddr_in));
-            ev_io_init(&cli_ctx->io, client_read, client_sock, EV_READ);
-            ev_io_start(loop, &cli_ctx->io);          
+            memcpy(&cli_ctx->client_addr, &client_addr, sizeof (struct sockaddr_in));
+            ev_io_init((ev_io *) & cli_ctx->io, client_read_write, client_sock, EV_READ | EV_WRITE);
+
+            ev_io_start(loop, (ev_io *) & cli_ctx->io);
             char time_buff[32];
-            strftime(time_buff, sizeof(time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&cli_ctx->connected_at));
+            strftime(time_buff, sizeof (time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&cli_ctx->connected_at));
             char *addr = inet_ntoa(cli_ctx->client_addr.sin_addr);
             char uuid_buff[37];
-            uuid_unparse_lower(cli_ctx->uuid, &uuid_buff);
-            printf("client accepted %s:%hu %s at %s\n", addr, client_addr.sin_port, &uuid_buff, &time_buff);            
+            uuid_unparse_lower(cli_ctx->uuid, (char *) &uuid_buff);
+            printf("client accepted %s:%hu %s at %s\n", addr, client_addr.sin_port, &uuid_buff, &time_buff);
         } else {
             if (errno == EAGAIN)
                 return;
@@ -138,6 +242,7 @@ static void on_connect(struct ev_loop *loop, struct ev_io *io, int revents) {
                 return;
             } else if (errno != EINTR) {
                 fprintf(stderr, "accept connections error\n");
+
                 return;
             }
         }
@@ -148,18 +253,18 @@ struct ev_loop *init_server_context(int sock) {
     struct ev_loop *loop = ev_default_loop(EVFLAG_AUTO);
     if (!loop)
         return NULL;
-    struct server_ctx *srv_ctx = (struct server_ctx *)calloc(1, sizeof(struct server_ctx));
+    struct server_ctx * srv_ctx = (struct server_ctx *) calloc(1, sizeof (struct server_ctx));
     srv_ctx->started_at = time(NULL);
     srv_ctx->clients_size = 64;
-    srv_ctx->clients = (struct client_ctx *)calloc(srv_ctx->clients_size, sizeof(struct client_ctx));
+    srv_ctx->clients = (struct client_ctx *) calloc(srv_ctx->clients_size, sizeof (struct client_ctx));
     char time_buff[32];
-    strftime(time_buff, sizeof(time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&srv_ctx->started_at));
+    strftime(time_buff, sizeof (time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&srv_ctx->started_at));
     printf("server started at %s\n", &time_buff);
-    
+
     ev_io_init(&srv_ctx->ss_io, on_connect, sock, EV_READ);
     ev_io_start(loop, &srv_ctx->ss_io);
-    ev_set_userdata(loop, (void*)srv_ctx);
-    
+    ev_set_userdata(loop, (void*) srv_ctx);
+
     return loop;
 }
 
@@ -168,13 +273,13 @@ int main(int argc, char** argv) {
     if ((sock = config_socket()) == -1) {
         return (EXIT_FAILURE);
     }
-  
-    struct ev_loop *loop = init_server_context(sock); 
+
+    struct ev_loop *loop = init_server_context(sock);
     if (!loop) {
         fprintf(stderr, "failed to initialize event loop and server context");
     }
     ev_loop(loop, 0);
-      
+
     return (EXIT_SUCCESS);
 }
 
