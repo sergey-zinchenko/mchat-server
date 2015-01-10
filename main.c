@@ -19,6 +19,10 @@
 #include <time.h>
 #include <uuid/uuid.h>
 
+#include <openssl/evp.h>
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
+
 struct client_ctx;
 
 struct io_with_cctx {
@@ -140,10 +144,34 @@ void delete_client_ctx(struct server_ctx *srv_ctx, struct client_ctx *cli_ctx) {
 
 
 static void on_client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, struct client_ctx *cli_ctx, char *msg, ssize_t msg_len) {
-    char* buff = (char *)malloc(msg_len + 1);
-    memcpy(buff, msg, msg_len);
-    buff[msg_len] = 0;
-    printf("%s\n", buff);
+   
+    BIO *bin, *b64;
+    bin = BIO_new_mem_buf(msg, msg_len + 2);
+    b64 = BIO_new(BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO_push(b64, bin);
+    ssize_t buff_len = 0;
+    ssize_t buff_pos = 0;
+    char* buff = NULL;
+    int bio_result;
+    do {
+        if (buff_len - buff_pos < 1024) {
+           char *new_buff = realloc(buff, buff_len + 1024);
+           memset(&new_buff[buff_pos], 0, buff_len - buff_pos);
+           if (!new_buff) {
+               bio_result = -1;
+               break;
+           }
+           buff = new_buff;
+           buff_len += 1024;
+        }
+        bio_result = BIO_read(b64, &buff[buff_pos], buff_len - buff_pos);
+        buff_pos += bio_result;
+    } while (bio_result > 0);
+    BIO_free_all(b64);
+    if ((bio_result == 0)&&(buff_pos > 0)) {
+        printf("%s\n", buff);
+    }
     free(buff);
 }
 
