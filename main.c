@@ -26,14 +26,10 @@ struct io_with_cctx {
     struct client_ctx *ctx;
 };
 
-typedef enum {
-    RS_WAIT_MESSAGE, RS_READ_MESSAGE
-} reader_state_t;
 
 struct read_ctx {
     char *read_buff;
     ssize_t read_buff_length, read_buff_pos, parser_pos, prev_parser_pos;
-    reader_state_t state;
 };
 
 struct message_to_write {
@@ -57,7 +53,7 @@ struct client_ctx {
 
 struct server_ctx {
     ev_io ss_io;
-    struct client_ctx *clients;
+    struct client_ctx **clients;
     ssize_t clients_size;
     ssize_t clients_count;
     time_t started_at;
@@ -118,22 +114,32 @@ int config_socket() {
     return sock;
 }
 
-struct client_ctx* get_unused_client_ctx(struct server_ctx *srv_ctx) {
+struct client_ctx* get_client_ctx(struct server_ctx *srv_ctx) {
     if (srv_ctx->clients_count == srv_ctx->clients_size) {
-        struct client_ctx *reallocated = realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof (struct client_ctx));
+        struct client_ctx **reallocated = (struct client_ctx **)realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof (struct client_ctx *));
         if (!reallocated) {
             fprintf(stderr, "failed to reallocate client list");
             return NULL;
         }
         srv_ctx->clients = reallocated;
         srv_ctx->clients_size += 64;
-        return &srv_ctx->clients[(srv_ctx->clients_count)++];
-    } else {
-        return &srv_ctx->clients[(srv_ctx->clients_count)++];
+    } 
+    return (srv_ctx->clients[(srv_ctx->clients_count)++] = (struct client_ctx *) calloc(1, sizeof(struct client_ctx)));
+}
+
+void delete_client_ctx(struct server_ctx *srv_ctx, struct client_ctx *cli_ctx) {
+    for (ssize_t i = 0; i < srv_ctx->clients_count; i++) {
+        if (uuid_compare(cli_ctx->uuid, srv_ctx->clients[i]->uuid) == 0) {
+            free(cli_ctx);
+            memmove(&srv_ctx->clients[i], &srv_ctx->clients[i + 1], sizeof(struct client_ctx *) * (srv_ctx->clients_count - i - 1));
+            srv_ctx->clients_count--;
+            return;
+        }
     }
 }
 
-static void client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, struct client_ctx *cli_ctx, char *msg, ssize_t msg_len) {
+
+static void on_client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, struct client_ctx *cli_ctx, char *msg, ssize_t msg_len) {
     char* buff = (char *)malloc(msg_len + 1);
     memcpy(buff, msg, msg_len);
     buff[msg_len] = 0;
@@ -147,26 +153,25 @@ static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revent
     if (revents & EV_READ) {
         while (1) {
             if (cli_ctx->r_ctx.read_buff_length == cli_ctx->r_ctx.read_buff_pos) {
-                char *new_buff = realloc(cli_ctx->r_ctx.read_buff, cli_ctx->r_ctx.read_buff_length + 16);
+                char *new_buff = realloc(cli_ctx->r_ctx.read_buff, cli_ctx->r_ctx.read_buff_length + 1024);
                 if (!new_buff)
                     break;
                 cli_ctx->r_ctx.read_buff = new_buff;
-                cli_ctx->r_ctx.read_buff_length += 16;
+                cli_ctx->r_ctx.read_buff_length += 1024;
             }
             ssize_t readed = read(io->fd, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.read_buff_pos], cli_ctx->r_ctx.read_buff_length - cli_ctx->r_ctx.read_buff_pos);
             if (readed > 0) {
                 cli_ctx->r_ctx.read_buff_pos += readed;
                 for (; cli_ctx->r_ctx.parser_pos < cli_ctx->r_ctx.read_buff_pos - 1; cli_ctx->r_ctx.parser_pos++) {
                     if ((cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos] == '\r')&&(cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos + 1] == '\n')) {
-                        if (cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos > 0) {
-                            client_message(loop, srv_ctx, cli_ctx, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.prev_parser_pos], cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos);   
-                        }
+                        if (cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos > 0)
+                            on_client_message(loop, srv_ctx, cli_ctx, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.prev_parser_pos], cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos);   
                         cli_ctx->r_ctx.parser_pos++;
                         cli_ctx->r_ctx.prev_parser_pos = cli_ctx->r_ctx.parser_pos + 1;
                     }
                 }
-                if (cli_ctx->r_ctx.prev_parser_pos >= 16) {
-                    ssize_t need_to_free = cli_ctx->r_ctx.prev_parser_pos / 16 * 16;
+                if (cli_ctx->r_ctx.prev_parser_pos >= 1024) {
+                    ssize_t need_to_free = cli_ctx->r_ctx.prev_parser_pos / 1024 * 1024;
                     ssize_t need_to_alloc = cli_ctx->r_ctx.read_buff_length - need_to_free;
                     char *new_buf = (char *)malloc(need_to_alloc);
                     if (!new_buf)
@@ -187,14 +192,22 @@ static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revent
                 return;
             } else {
                 ev_io_stop(loop, io);
+                close(io->fd);
+                free(cli_ctx->r_ctx.read_buff);
+                cli_ctx->r_ctx.read_buff = NULL;
+                cli_ctx->r_ctx.read_buff_length = 0;
+                cli_ctx->r_ctx.read_buff_pos = 0;
+                cli_ctx->r_ctx.parser_pos = 0;
+                cli_ctx->r_ctx.prev_parser_pos = 0;
                 char time_buff[32];
                 time_t now = time(NULL);
                 strftime(time_buff, sizeof (time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&now));
                 char *addr = inet_ntoa(cli_ctx->client_addr.sin_addr);
                 char uuid_buff[37];
                 uuid_unparse_lower(cli_ctx->uuid, (char *) &uuid_buff);
-                printf("client closed connection %s %s at %s\n", addr, &uuid_buff, &time_buff);
-                break;
+                printf("client closed connection %s:%hu %s at %s\n", addr, cli_ctx->client_addr.sin_port, &uuid_buff, &time_buff);
+                delete_client_ctx(srv_ctx, cli_ctx);
+                return;
             }
         }
     }
@@ -239,10 +252,8 @@ static void on_connect(struct ev_loop *loop, struct ev_io *io, int revents) {
             }
 
             struct server_ctx *srv_ctx = (struct server_ctx *) ev_userdata(loop);
-            struct client_ctx* cli_ctx = get_unused_client_ctx(srv_ctx);
-            memset(cli_ctx, 0, sizeof (struct client_ctx));
+            struct client_ctx* cli_ctx = get_client_ctx(srv_ctx);
             cli_ctx->io.ctx = cli_ctx;
-            cli_ctx->r_ctx.state = RS_WAIT_MESSAGE;
             cli_ctx->connected_at = time(NULL);
             uuid_generate(cli_ctx->uuid);
             memcpy(&cli_ctx->client_addr, &client_addr, sizeof (struct sockaddr_in));
@@ -277,7 +288,7 @@ struct ev_loop *init_server_context(int sock) {
     struct server_ctx * srv_ctx = (struct server_ctx *) calloc(1, sizeof (struct server_ctx));
     srv_ctx->started_at = time(NULL);
     srv_ctx->clients_size = 64;
-    srv_ctx->clients = (struct client_ctx *) calloc(srv_ctx->clients_size, sizeof (struct client_ctx));
+    srv_ctx->clients = (struct client_ctx **) calloc(srv_ctx->clients_size, sizeof (struct client_ctx *));
     char time_buff[32];
     strftime(time_buff, sizeof (time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&srv_ctx->started_at));
     printf("server started at %s\n", &time_buff);
