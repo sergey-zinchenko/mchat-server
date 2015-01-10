@@ -137,7 +137,8 @@ static void client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, str
     char* buff = (char *)malloc(msg_len + 1);
     memcpy(buff, msg, msg_len);
     buff[msg_len] = 0;
-    printf("%s", buff);
+    printf("%s\n", buff);
+    free(buff);
 }
 
 static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revents) {
@@ -146,26 +147,38 @@ static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revent
     if (revents & EV_READ) {
         while (1) {
             if (cli_ctx->r_ctx.read_buff_length == cli_ctx->r_ctx.read_buff_pos) {
-                char *new_buff = realloc(cli_ctx->r_ctx.read_buff, cli_ctx->r_ctx.read_buff_length + 512);
+                char *new_buff = realloc(cli_ctx->r_ctx.read_buff, cli_ctx->r_ctx.read_buff_length + 16);
                 if (!new_buff)
                     break;
                 cli_ctx->r_ctx.read_buff = new_buff;
-                cli_ctx->r_ctx.read_buff_length += 512;
+                cli_ctx->r_ctx.read_buff_length += 16;
             }
             ssize_t readed = read(io->fd, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.read_buff_pos], cli_ctx->r_ctx.read_buff_length - cli_ctx->r_ctx.read_buff_pos);
             if (readed > 0) {
                 cli_ctx->r_ctx.read_buff_pos += readed;
                 for (; cli_ctx->r_ctx.parser_pos < cli_ctx->r_ctx.read_buff_pos - 1; cli_ctx->r_ctx.parser_pos++) {
-                    if ((cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos] == 'q')&&(cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos + 1] == 'w')) {
-                        if (cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos > 0)
-                            client_message(loop, srv_ctx, cli_ctx, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.prev_parser_pos], cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos);
+                    if ((cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos] == '\r')&&(cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos + 1] == '\n')) {
+                        if (cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos > 0) {
+                            client_message(loop, srv_ctx, cli_ctx, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.prev_parser_pos], cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos);   
+                        }
                         cli_ctx->r_ctx.parser_pos++;
                         cli_ctx->r_ctx.prev_parser_pos = cli_ctx->r_ctx.parser_pos + 1;
                     }
                 }
-
-               
-
+                if (cli_ctx->r_ctx.prev_parser_pos >= 16) {
+                    ssize_t need_to_free = cli_ctx->r_ctx.prev_parser_pos / 16 * 16;
+                    ssize_t need_to_alloc = cli_ctx->r_ctx.read_buff_length - need_to_free;
+                    char *new_buf = (char *)malloc(need_to_alloc);
+                    if (!new_buf)
+                        break;
+                    memcpy(new_buf, &cli_ctx->r_ctx.read_buff[need_to_free], need_to_alloc);
+                    free(cli_ctx->r_ctx.read_buff);
+                    cli_ctx->r_ctx.read_buff = new_buf;
+                    cli_ctx->r_ctx.prev_parser_pos -= need_to_free;
+                    cli_ctx->r_ctx.parser_pos -= need_to_free;
+                    cli_ctx->r_ctx.read_buff_pos -= need_to_free;
+                    cli_ctx->r_ctx.read_buff_length = need_to_alloc;   
+                }
             } else if (readed < 0) {
                 if (errno == EAGAIN)
                     break;
@@ -173,6 +186,14 @@ static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revent
                     continue;
                 return;
             } else {
+                ev_io_stop(loop, io);
+                char time_buff[32];
+                time_t now = time(NULL);
+                strftime(time_buff, sizeof (time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&now));
+                char *addr = inet_ntoa(cli_ctx->client_addr.sin_addr);
+                char uuid_buff[37];
+                uuid_unparse_lower(cli_ctx->uuid, (char *) &uuid_buff);
+                printf("client closed connection %s %s at %s\n", addr, &uuid_buff, &time_buff);
                 break;
             }
         }
