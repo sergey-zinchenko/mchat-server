@@ -42,7 +42,6 @@
           <linkerLibItems>
             <linkerOptionItem>-lev</linkerOptionItem>
             <linkerOptionItem>-luuid</linkerOptionItem>
-            <linkerOptionItem>-lcrypt</linkerOptionItem>
             <linkerOptionItem>-lssl</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
@@ -74,7 +73,6 @@
           <linkerLibItems>
             <linkerOptionItem>-lev</linkerOptionItem>
             <linkerOptionItem>-luuid</linkerOptionItem>
-            <linkerOptionItem>-lcrypt</linkerOptionItem>
             <linkerOptionItem>-lssl</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>

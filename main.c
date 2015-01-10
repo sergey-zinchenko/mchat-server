@@ -18,10 +18,8 @@
 #include <errno.h>
 #include <time.h>
 #include <uuid/uuid.h>
-
 #include <openssl/evp.h>
 #include <openssl/bio.h>
-#include <openssl/buffer.h>
 
 struct client_ctx;
 
