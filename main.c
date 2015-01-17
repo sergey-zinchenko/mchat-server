@@ -20,6 +20,7 @@
 #include <uuid/uuid.h>
 #include <openssl/evp.h>
 #include <openssl/bio.h>
+#include <yajl/yajl_tree.h>
 
 struct client_ctx;
 
@@ -27,7 +28,6 @@ struct io_with_cctx {
     ev_io io;
     struct client_ctx *ctx;
 };
-
 
 struct read_ctx {
     char *read_buff;
@@ -118,31 +118,58 @@ int config_socket() {
 
 struct client_ctx* get_client_ctx(struct server_ctx *srv_ctx) {
     if (srv_ctx->clients_count == srv_ctx->clients_size) {
-        struct client_ctx **reallocated = (struct client_ctx **)realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof (struct client_ctx *));
+        struct client_ctx **reallocated = (struct client_ctx **) realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof (struct client_ctx *));
         if (!reallocated) {
             fprintf(stderr, "failed to reallocate client list");
             return NULL;
         }
         srv_ctx->clients = reallocated;
         srv_ctx->clients_size += 64;
-    } 
-    return (srv_ctx->clients[(srv_ctx->clients_count)++] = (struct client_ctx *) calloc(1, sizeof(struct client_ctx)));
+    }
+    return (srv_ctx->clients[(srv_ctx->clients_count)++] = (struct client_ctx *) calloc(1, sizeof (struct client_ctx)));
 }
 
 void delete_client_ctx(struct server_ctx *srv_ctx, struct client_ctx *cli_ctx) {
     for (ssize_t i = 0; i < srv_ctx->clients_count; i++) {
         if (uuid_compare(cli_ctx->uuid, srv_ctx->clients[i]->uuid) == 0) {
             free(cli_ctx);
-            memmove(&srv_ctx->clients[i], &srv_ctx->clients[i + 1], sizeof(struct client_ctx *) * (srv_ctx->clients_count - i - 1));
+            memmove(&srv_ctx->clients[i], &srv_ctx->clients[i + 1], sizeof (struct client_ctx *) * (srv_ctx->clients_count - i - 1));
             srv_ctx->clients_count--;
             return;
         }
     }
 }
 
+static void process_client_msg(struct ev_loop *loop, struct server_ctx *srv_ctx, struct client_ctx *cli_ctx, char *msg, ssize_t msg_len) {
+
+    yajl_val node = yajl_tree_parse(msg, NULL, 0);
+    if (node == NULL) {
+        fprintf(stderr, "json parse_error");
+        return;
+    }
+    const char * to_path[] = {"to", NULL};
+    yajl_val to_vaues = yajl_tree_get(node, to_path, yajl_t_array);
+    if (to_vaues) {
+        
+        uuid_t *uuids_to = calloc(to_vaues->u.array.len, sizeof (uuid_t));
+        for (size_t i = 0; i < to_vaues->u.array.len; i++) {
+            if (uuid_parse(YAJL_GET_STRING(to_vaues->u.array.values[i]), uuids_to[i]) != 0) {
+                return;
+            }
+            
+        }
+        
+        
+        
+        free(uuids_to);
+    }
+
+    yajl_tree_free(node);
+
+}
 
 static void on_client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, struct client_ctx *cli_ctx, char *msg, ssize_t msg_len) {
-   
+
     BIO *bin, *b64;
     bin = BIO_new_mem_buf(msg, msg_len + 2);
     b64 = BIO_new(BIO_f_base64());
@@ -154,21 +181,21 @@ static void on_client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, 
     int bio_result;
     do {
         if (buff_len - buff_pos < 1024) {
-           char *new_buff = realloc(buff, buff_len + 1024);
-           memset(&new_buff[buff_pos], 0, buff_len - buff_pos);
-           if (!new_buff) {
-               bio_result = -1;
-               break;
-           }
-           buff = new_buff;
-           buff_len += 1024;
+            char *new_buff = realloc(buff, buff_len + 1024);
+            memset(&new_buff[buff_pos], 0, buff_len - buff_pos);
+            if (!new_buff) {
+                bio_result = -1;
+                break;
+            }
+            buff = new_buff;
+            buff_len += 1024;
         }
         bio_result = BIO_read(b64, &buff[buff_pos], buff_len - buff_pos);
         buff_pos += bio_result;
     } while (bio_result > 0);
     BIO_free_all(b64);
     if ((bio_result == 0)&&(buff_pos > 0)) {
-        printf("%s\n", buff);
+        process_client_msg(loop, srv_ctx, cli_ctx, buff, buff_len);
     }
     free(buff);
 }
@@ -191,7 +218,7 @@ static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revent
                 for (; cli_ctx->r_ctx.parser_pos < cli_ctx->r_ctx.read_buff_pos - 1; cli_ctx->r_ctx.parser_pos++) {
                     if ((cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos] == '\r')&&(cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.parser_pos + 1] == '\n')) {
                         if (cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos > 0)
-                            on_client_message(loop, srv_ctx, cli_ctx, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.prev_parser_pos], cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos);   
+                            on_client_message(loop, srv_ctx, cli_ctx, &cli_ctx->r_ctx.read_buff[cli_ctx->r_ctx.prev_parser_pos], cli_ctx->r_ctx.parser_pos - cli_ctx->r_ctx.prev_parser_pos);
                         cli_ctx->r_ctx.parser_pos++;
                         cli_ctx->r_ctx.prev_parser_pos = cli_ctx->r_ctx.parser_pos + 1;
                     }
@@ -199,7 +226,7 @@ static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revent
                 if (cli_ctx->r_ctx.prev_parser_pos >= 1024) {
                     ssize_t need_to_free = cli_ctx->r_ctx.prev_parser_pos / 1024 * 1024;
                     ssize_t need_to_alloc = cli_ctx->r_ctx.read_buff_length - need_to_free;
-                    char *new_buf = (char *)malloc(need_to_alloc);
+                    char *new_buf = (char *) malloc(need_to_alloc);
                     if (!new_buf)
                         break;
                     memcpy(new_buf, &cli_ctx->r_ctx.read_buff[need_to_free], need_to_alloc);
@@ -208,7 +235,7 @@ static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revent
                     cli_ctx->r_ctx.prev_parser_pos -= need_to_free;
                     cli_ctx->r_ctx.parser_pos -= need_to_free;
                     cli_ctx->r_ctx.read_buff_pos -= need_to_free;
-                    cli_ctx->r_ctx.read_buff_length = need_to_alloc;   
+                    cli_ctx->r_ctx.read_buff_length = need_to_alloc;
                 }
             } else if (readed < 0) {
                 if (errno == EAGAIN)

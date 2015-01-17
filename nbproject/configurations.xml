@@ -43,6 +43,7 @@
             <linkerOptionItem>-lev</linkerOptionItem>
             <linkerOptionItem>-luuid</linkerOptionItem>
             <linkerOptionItem>-lssl</linkerOptionItem>
+            <linkerOptionItem>-lyajl </linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>
@@ -74,6 +75,7 @@
             <linkerOptionItem>-lev</linkerOptionItem>
             <linkerOptionItem>-luuid</linkerOptionItem>
             <linkerOptionItem>-lssl</linkerOptionItem>
+            <linkerOptionItem>-lyajl </linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>
