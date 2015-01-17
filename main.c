@@ -20,6 +20,7 @@
 #include <uuid/uuid.h>
 #include <openssl/evp.h>
 #include <openssl/bio.h>
+#include <json/json.h>
 
 struct client_ctx;
 
@@ -327,6 +328,7 @@ struct ev_loop *init_server_context(int sock) {
 }
 
 int main(int argc, char** argv) {
+    
     int sock;
     if ((sock = config_socket()) == -1) {
         return (EXIT_FAILURE);

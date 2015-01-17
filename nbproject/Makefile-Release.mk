@@ -52,7 +52,7 @@ FFLAGS=
 ASFLAGS=
 
 # Link Libraries and Options
-LDLIBSOPTIONS=-lev -luuid -lssl
+LDLIBSOPTIONS=-lev -luuid -lssl -ljson
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
