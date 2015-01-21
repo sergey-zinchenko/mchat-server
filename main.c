@@ -5,61 +5,7 @@
  * Created on January 7, 2015, 6:23 PM
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <ev.h>
-#include <errno.h>
-#include <time.h>
-#include <uuid/uuid.h>
-#include <openssl/evp.h>
-#include <openssl/bio.h>
-#include <json/json.h>
-
-struct client_ctx;
-
-struct io_with_cctx {
-    ev_io io;
-    struct client_ctx *ctx;
-};
-
-struct read_ctx {
-    char *read_buff;
-    ssize_t read_buff_length, read_buff_pos, parser_pos, prev_parser_pos;
-};
-
-struct message_to_write {
-    char *write_buff;
-    ssize_t write_buf_length, write_buff_pos;
-};
-
-struct write_ctx {
-    struct message_to_write *buffs;
-    ssize_t buffs_cout, buffs_length;
-};
-
-struct client_ctx {
-    uuid_t uuid;
-    struct io_with_cctx io;
-    struct sockaddr_in client_addr;
-    time_t connected_at;
-    struct write_ctx w_ctx;
-    struct read_ctx r_ctx;
-};
-
-struct server_ctx {
-    ev_io ss_io;
-    struct client_ctx **clients;
-    ssize_t clients_size;
-    ssize_t clients_count;
-    time_t started_at;
-};
+#include "main.h"
 
 /* Prepare a server socket  
  Returns -1 for error, or configured socket otherwise.  */
@@ -116,9 +62,9 @@ int config_socket() {
     return sock;
 }
 
-struct client_ctx* get_client_ctx(struct server_ctx *srv_ctx) {
+client_ctx_t* get_client_ctx(server_ctx_t *srv_ctx) {
     if (srv_ctx->clients_count == srv_ctx->clients_size) {
-        struct client_ctx **reallocated = (struct client_ctx **) realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof (struct client_ctx *));
+        client_ctx_t **reallocated = (client_ctx_t **) realloc(srv_ctx->clients, (srv_ctx->clients_size + 64) * sizeof (client_ctx_t *));
         if (!reallocated) {
             fprintf(stderr, "failed to reallocate client list");
             return NULL;
@@ -126,14 +72,14 @@ struct client_ctx* get_client_ctx(struct server_ctx *srv_ctx) {
         srv_ctx->clients = reallocated;
         srv_ctx->clients_size += 64;
     }
-    return (srv_ctx->clients[(srv_ctx->clients_count)++] = (struct client_ctx *) calloc(1, sizeof (struct client_ctx)));
+    return (srv_ctx->clients[(srv_ctx->clients_count)++] = (client_ctx_t *) calloc(1, sizeof (client_ctx_t)));
 }
 
-void delete_client_ctx(struct server_ctx *srv_ctx, struct client_ctx *cli_ctx) {
+void delete_client_ctx(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
     for (ssize_t i = 0; i < srv_ctx->clients_count; i++) {
         if (uuid_compare(cli_ctx->uuid, srv_ctx->clients[i]->uuid) == 0) {
             free(cli_ctx);
-            memmove(&srv_ctx->clients[i], &srv_ctx->clients[i + 1], sizeof (struct client_ctx *) * (srv_ctx->clients_count - i - 1));
+            memmove(&srv_ctx->clients[i], &srv_ctx->clients[i + 1], sizeof (client_ctx_t *) * (srv_ctx->clients_count - i - 1));
             srv_ctx->clients_count--;
             return;
         }
@@ -175,7 +121,7 @@ static char * do_base64(const char *data, ssize_t data_len) {
     }
 }
 
-static char * do_unbase64(const char *data, ssize_t data_len) {
+static char * do_unbase64(char *data, ssize_t data_len) {
     BIO *bin, *b64;
     bin = BIO_new_mem_buf(data, data_len);
     b64 = BIO_new(BIO_f_base64());
@@ -208,7 +154,28 @@ static char * do_unbase64(const char *data, ssize_t data_len) {
     }
 }
 
-static void process_client_msg(struct ev_loop *loop, struct server_ctx *srv_ctx, struct client_ctx *cli_ctx, char *msg) {
+static void add_message_to_send(client_ctx_t *cli_ctx, char *msg, size_t msg_size) {
+
+   if (cli_ctx->w_ctx.buffs_count == cli_ctx->w_ctx.buffs_length) {
+        message_buff_t *reallocated = (message_buff_t *) realloc(cli_ctx->w_ctx.buffs, (cli_ctx->w_ctx.buffs_length + 8) * sizeof (message_buff_t));
+        if (!reallocated) {
+            fprintf(stderr, "failed to reallocate buffers list");
+            return NULL;
+        }
+        cli_ctx->w_ctx.buffs = reallocated;
+        cli_ctx->w_ctx.buffs_length += 8;
+    }
+    return (cli_ctx->w_ctx.buffs[(cli_ctx->w_ctx.buffs_count)++]);
+    
+    
+    
+}
+
+static void send_msg(struct ev_loop *loop, struct client_ctx_t* cli_ctx) {
+    
+}
+
+static void process_client_msg(struct ev_loop *loop, server_ctx_t *srv_ctx, client_ctx_t *cli_ctx, char *msg) {
 
     json_object * msg_obj = json_tokener_parse(msg);
     json_object * to_array_obj = json_object_object_get(msg_obj, "to");
@@ -229,6 +196,7 @@ static void process_client_msg(struct ev_loop *loop, struct server_ctx *srv_ctx,
     const char *out = json_object_to_json_string(msg_obj);
     char *base64_out = do_base64(out, strlen(out));
     printf("%s\n", base64_out);
+    
     free(base64_out);
 
 
@@ -237,7 +205,7 @@ static void process_client_msg(struct ev_loop *loop, struct server_ctx *srv_ctx,
 
 }
 
-static void on_client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, struct client_ctx *cli_ctx, char *msg, ssize_t msg_len) {
+static void on_client_message(struct ev_loop *loop, server_ctx_t *srv_ctx, client_ctx_t *cli_ctx, char *msg, ssize_t msg_len) {
 
     char *unbase_msg = do_unbase64(msg, msg_len);
     if (unbase_msg) {
@@ -247,8 +215,8 @@ static void on_client_message(struct ev_loop *loop, struct server_ctx *srv_ctx, 
 }
 
 static void client_read_write(struct ev_loop *loop, struct ev_io *io, int revents) {
-    struct server_ctx *srv_ctx = (struct server_ctx *) ev_userdata(loop);
-    struct client_ctx *cli_ctx = (struct client_ctx *) (((struct io_with_cctx*) io)->ctx);
+    server_ctx_t *srv_ctx = (server_ctx_t *) ev_userdata(loop);
+    client_ctx_t *cli_ctx = (client_ctx_t *) (((io_with_cctx_t*) io)->ctx);
     if (revents & EV_READ) {
         while (1) {
             if (cli_ctx->r_ctx.read_buff_length == cli_ctx->r_ctx.read_buff_pos) {
@@ -350,13 +318,13 @@ static void on_connect(struct ev_loop *loop, struct ev_io *io, int revents) {
                 return;
             }
 
-            struct server_ctx *srv_ctx = (struct server_ctx *) ev_userdata(loop);
-            struct client_ctx* cli_ctx = get_client_ctx(srv_ctx);
+            server_ctx_t *srv_ctx = (server_ctx_t *) ev_userdata(loop);
+            client_ctx_t* cli_ctx = get_client_ctx(srv_ctx);
             cli_ctx->io.ctx = cli_ctx;
             cli_ctx->connected_at = time(NULL);
             uuid_generate(cli_ctx->uuid);
             memcpy(&cli_ctx->client_addr, &client_addr, sizeof (struct sockaddr_in));
-            ev_io_init((ev_io *) & cli_ctx->io, client_read_write, client_sock, EV_READ | EV_WRITE);
+            ev_io_init((ev_io *) & cli_ctx->io, client_read_write, client_sock, EV_READ);
 
             ev_io_start(loop, (ev_io *) & cli_ctx->io);
             char time_buff[32];
@@ -384,10 +352,10 @@ struct ev_loop *init_server_context(int sock) {
     struct ev_loop *loop = ev_default_loop(EVFLAG_AUTO);
     if (!loop)
         return NULL;
-    struct server_ctx * srv_ctx = (struct server_ctx *) calloc(1, sizeof (struct server_ctx));
+    server_ctx_t * srv_ctx = (server_ctx_t *) calloc(1, sizeof (server_ctx_t));
     srv_ctx->started_at = time(NULL);
     srv_ctx->clients_size = 64;
-    srv_ctx->clients = (struct client_ctx **) calloc(srv_ctx->clients_size, sizeof (struct client_ctx *));
+    srv_ctx->clients = (client_ctx_t **) calloc(srv_ctx->clients_size, sizeof (client_ctx_t *));
     char time_buff[32];
     strftime(time_buff, sizeof (time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&srv_ctx->started_at));
     printf("server started at %s\n", &time_buff);
