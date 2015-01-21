@@ -11,6 +11,12 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+    
+#include <ev.h>
+#include <unistd.h>
+#include <uuid/uuid.h>
+#include <time.h>
+#include <netinet/in.h>    
 
 struct client_ctx_t;
 

@@ -6,6 +6,9 @@
                    projectFiles="true">
       <itemPath>base64.h</itemPath>
       <itemPath>main.h</itemPath>
+      <itemPath>srvclientutils.h</itemPath>
+      <itemPath>srvcore.h</itemPath>
+      <itemPath>srvevents.h</itemPath>
       <itemPath>srvsockutils.h</itemPath>
       <itemPath>srvtypes.h</itemPath>
     </logicalFolder>
@@ -18,6 +21,9 @@
                    projectFiles="true">
       <itemPath>base64.c</itemPath>
       <itemPath>main.c</itemPath>
+      <itemPath>srvclientutils.c</itemPath>
+      <itemPath>srvcore.c</itemPath>
+      <itemPath>srvevents.c</itemPath>
       <itemPath>srvsockutils.c</itemPath>
     </logicalFolder>
     <logicalFolder name="TestFiles"
@@ -72,6 +78,18 @@
       </item>
       <item path="main.h" ex="false" tool="3" flavor2="0">
       </item>
+      <item path="srvclientutils.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="srvclientutils.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="srvcore.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="srvcore.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="srvevents.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="srvevents.h" ex="false" tool="3" flavor2="0">
+      </item>
       <item path="srvsockutils.c" ex="false" tool="0" flavor2="0">
       </item>
       <item path="srvsockutils.h" ex="false" tool="3" flavor2="0">
@@ -115,6 +133,18 @@
       <item path="main.c" ex="false" tool="0" flavor2="0">
       </item>
       <item path="main.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="srvclientutils.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="srvclientutils.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="srvcore.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="srvcore.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="srvevents.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="srvevents.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="srvsockutils.c" ex="false" tool="0" flavor2="0">
       </item>

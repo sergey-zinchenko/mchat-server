@@ -37,6 +37,9 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 OBJECTFILES= \
 	${OBJECTDIR}/base64.o \
 	${OBJECTDIR}/main.o \
+	${OBJECTDIR}/srvclientutils.o \
+	${OBJECTDIR}/srvcore.o \
+	${OBJECTDIR}/srvevents.o \
 	${OBJECTDIR}/srvsockutils.o
 
 
@@ -73,6 +76,21 @@ ${OBJECTDIR}/main.o: main.c
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.c) -g -std=c99 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.c
+
+${OBJECTDIR}/srvclientutils.o: srvclientutils.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -g -std=c99 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/srvclientutils.o srvclientutils.c
+
+${OBJECTDIR}/srvcore.o: srvcore.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -g -std=c99 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/srvcore.o srvcore.c
+
+${OBJECTDIR}/srvevents.o: srvevents.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -g -std=c99 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/srvevents.o srvevents.c
 
 ${OBJECTDIR}/srvsockutils.o: srvsockutils.c 
 	${MKDIR} -p ${OBJECTDIR}

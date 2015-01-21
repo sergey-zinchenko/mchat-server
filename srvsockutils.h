@@ -24,7 +24,7 @@ extern "C" {
     int set_linger(int soc);
     int set_keepalive(int sock);
     void shutdown_printerr(int sock, char *msg);
-
+        
 #ifdef	__cplusplus
 }
 #endif

@@ -1,5 +1,5 @@
 /* 
- * File:   srvsockutils.h
+ * File:   srvsockutils.c
  * Author: Sergey Zinchenko
  *
  * Created on January 21, 2015, 2:36 PM
