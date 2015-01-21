@@ -29,7 +29,23 @@ int set_reuseaddr(int sock) {
     return setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof (flag));
 }
 
+/* Configure given socket with linger option {0, 0}.
+ * @param sock Socket to configure 
+ * @return 0 if no errors and -1 otherwise.
+ */
+int set_linger(int soc) {
+    struct linger l = {0, 0};
+    return setsockopt(soc, SOL_SOCKET, SO_LINGER, &l, sizeof (l));
+}
 
+/* Configure given socket to allow sending keep-alive.
+ * @param sock Socket to configure.
+ * @return 0 if no errors and -1 otherwise.
+ */
+int set_keepalive(int sock) {
+    int keep_alive = 1;
+    return setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keep_alive, sizeof (keep_alive));
+}
 
 /* Prepare a server socket  
  * @return -1 for error, or configured socket otherwise.  
@@ -73,4 +89,16 @@ int config_socket() {
     }
 
     return sock;
+}
+
+/* Shutdown both read and write before closing socket. 
+ * After that message will be printed into stderr.
+ * @param sock Socket to close.
+ * @param mag Message to print into stderr.
+ */
+void shutdown_printerr(int sock, char *msg) {
+    if (msg)
+        fprintf(stderr, msg);
+    shutdown(sock, SHUT_RDWR);
+    close(sock);
 }

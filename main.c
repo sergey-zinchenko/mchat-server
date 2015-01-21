@@ -33,7 +33,7 @@ void delete_client_ctx(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
 
 
 
-static void add_message_to_send(client_ctx_t *cli_ctx, char *msg, size_t msg_size) {
+void add_message_to_send(client_ctx_t *cli_ctx, char *msg, size_t msg_size) {
 
    if (cli_ctx->w_ctx.buffs_count == cli_ctx->w_ctx.buffs_length) {
         message_buff_t *reallocated = (message_buff_t *) realloc(cli_ctx->w_ctx.buffs, (cli_ctx->w_ctx.buffs_length + 8) * sizeof (message_buff_t));
@@ -50,11 +50,11 @@ static void add_message_to_send(client_ctx_t *cli_ctx, char *msg, size_t msg_siz
     
 }
 
-static void send_msg(EV_P_ client_ctx_t* cli_ctx) {
+void send_msg(EV_P_ client_ctx_t* cli_ctx) {
     
 }
 
-static void process_client_msg(EV_P_ server_ctx_t *srv_ctx, client_ctx_t *cli_ctx, char *msg) {
+void process_client_msg(EV_P_ server_ctx_t *srv_ctx, client_ctx_t *cli_ctx, char *msg) {
 
     json_object * msg_obj = json_tokener_parse(msg);
     json_object * to_array_obj = json_object_object_get(msg_obj, "to");
@@ -84,8 +84,7 @@ static void process_client_msg(EV_P_ server_ctx_t *srv_ctx, client_ctx_t *cli_ct
 
 }
 
-static void on_client_message(EV_P_ server_ctx_t *srv_ctx, client_ctx_t *cli_ctx, char *msg, ssize_t msg_len) {
-
+void on_client_message(EV_P_ server_ctx_t *srv_ctx, client_ctx_t *cli_ctx, char *msg, ssize_t msg_len) {
     char *unbase_msg = base64_decode(msg, msg_len);
     if (unbase_msg) {
         process_client_msg(loop, srv_ctx, cli_ctx, unbase_msg);
@@ -93,7 +92,7 @@ static void on_client_message(EV_P_ server_ctx_t *srv_ctx, client_ctx_t *cli_ctx
     }
 }
 
-static void client_read_write(EV_P_ struct ev_io *io, int revents) {
+void client_read_write(EV_P_ struct ev_io *io, int revents) {
     server_ctx_t *srv_ctx = (server_ctx_t *) ev_userdata(loop);
     client_ctx_t *cli_ctx = (client_ctx_t *) (((io_with_cctx_t*) io)->ctx);
     if (revents & EV_READ) {
@@ -162,38 +161,25 @@ static void client_read_write(EV_P_ struct ev_io *io, int revents) {
     }
 }
 
-static void on_connect(EV_P_ struct ev_io *io, int revents) {
+void on_connect(EV_P_ struct ev_io *io, int revents) {
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t len = sizeof (struct sockaddr_in);
         int client_sock = accept(io->fd, (struct sockaddr *) &client_addr, &len);
         if (client_sock >= 0) {
-
-            long fl = fcntl(client_sock, F_GETFL);
-            if (fl == -1) {
-                fprintf(stderr, "can't get the socket mode for client\n");
-                shutdown(client_sock, SHUT_RDWR);
-                close(client_sock);
+            
+            if (set_nonblock(client_sock) == -1) {  
+                shutdown_printerr(client_sock, "can't set the socket mode O_NONBLOCK for client\n");
                 return;
             }
-            if (fcntl(client_sock, F_SETFL, fl | O_NONBLOCK) == -1) {
-                fprintf(stderr, "can't set the socket mode O_NONBLOCK for client\n");
-                shutdown(client_sock, SHUT_RDWR);
-                close(client_sock);
+            
+            if (set_linger(client_sock) == -1) {
+                shutdown_printerr(client_sock, "can't set SO_LINGER sock option for client\n");
                 return;
             }
-            struct linger l = {0, 0};
-            if (setsockopt(client_sock, SOL_SOCKET, SO_LINGER, &l, sizeof (l)) == -1) {
-                fprintf(stderr, "can't set SO_LINGER sock option for client\n");
-                shutdown(client_sock, SHUT_RDWR);
-                close(client_sock);
-                return;
-            }
-            int keep_alive = 1;
-            if (setsockopt(client_sock, SOL_SOCKET, SO_KEEPALIVE, &keep_alive, sizeof (keep_alive)) == -1) {
-                fprintf(stderr, "can't set SO_KEEPALIVE sock option for client\n");
-                shutdown(client_sock, SHUT_RDWR);
-                close(client_sock);
+          
+            if (set_keepalive(client_sock) == -1) {
+                shutdown_printerr(client_sock, "can't set SO_KEEPALIVE sock option for client\n");
                 return;
             }
 
@@ -220,7 +206,6 @@ static void on_connect(EV_P_ struct ev_io *io, int revents) {
                 return;
             } else if (errno != EINTR) {
                 fprintf(stderr, "accept connections error\n");
-
                 return;
             }
         }

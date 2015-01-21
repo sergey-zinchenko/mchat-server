@@ -20,7 +20,10 @@ extern "C" {
     
     int config_socket();
     int set_nonblock(int sock);
-    int set_reuseaddr(int sock); 
+    int set_reuseaddr(int sock);
+    int set_linger(int soc);
+    int set_keepalive(int sock);
+    void shutdown_printerr(int sock, char *msg);
 
 #ifdef	__cplusplus
 }
