@@ -1,6 +1,6 @@
 /* 
  * File:   base64.h
- * Author: user
+ * Author: Sergey Zinchenko
  *
  * Created on January 21, 2015, 2:07 PM
  */

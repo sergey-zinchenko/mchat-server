@@ -28,6 +28,7 @@ extern "C" {
 #include <json/json.h>
 #include "srvtypes.h"
 #include "base64.h"
+#include "srvsockutils.h"
     
 #ifdef	__cplusplus
 }

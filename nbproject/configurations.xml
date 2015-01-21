@@ -6,6 +6,7 @@
                    projectFiles="true">
       <itemPath>base64.h</itemPath>
       <itemPath>main.h</itemPath>
+      <itemPath>srvsockutils.h</itemPath>
       <itemPath>srvtypes.h</itemPath>
     </logicalFolder>
     <logicalFolder name="ResourceFiles"
@@ -17,6 +18,7 @@
                    projectFiles="true">
       <itemPath>base64.c</itemPath>
       <itemPath>main.c</itemPath>
+      <itemPath>srvsockutils.c</itemPath>
     </logicalFolder>
     <logicalFolder name="TestFiles"
                    displayName="Test Files"
@@ -70,6 +72,10 @@
       </item>
       <item path="main.h" ex="false" tool="3" flavor2="0">
       </item>
+      <item path="srvsockutils.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="srvsockutils.h" ex="false" tool="3" flavor2="0">
+      </item>
       <item path="srvtypes.h" ex="false" tool="3" flavor2="0">
       </item>
     </conf>
@@ -109,6 +115,10 @@
       <item path="main.c" ex="false" tool="0" flavor2="0">
       </item>
       <item path="main.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="srvsockutils.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="srvsockutils.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="srvtypes.h" ex="false" tool="3" flavor2="0">
       </item>
