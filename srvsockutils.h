@@ -13,10 +13,14 @@ extern "C" {
 #endif
     
     #include <stdio.h>
+    #include <string.h>
+    #include <unistd.h>
     #include <fcntl.h>
     #include <arpa/inet.h>
     
     int config_socket();
+    int set_nonblock(int sock);
+    int set_reuseaddr(int sock); 
 
 #ifdef	__cplusplus
 }

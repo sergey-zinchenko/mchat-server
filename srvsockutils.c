@@ -7,8 +7,33 @@
 
 #include "srvsockutils.h"
 
+/* Configure given socket to non blocking mode.
+ * @param sock Socket to configure 
+ * @return 0 if no errors and -1 otherwise.
+ */
+int set_nonblock(int sock) {
+    long fl = fcntl(sock, F_GETFL);
+    if (fl == -1)
+        return -1;
+    if (fcntl(sock, F_SETFL, fl | O_NONBLOCK) == -1)
+        return -1;
+    return 0;
+}
+
+/* Configure given socket to allow reuse address.
+ * @param sock Socket to configure 
+ * @return 0 if no errors and -1 otherwise.
+ */
+int set_reuseaddr(int sock) {
+    int flag = 1;
+    return setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof (flag));
+}
+
+
+
 /* Prepare a server socket  
- Returns -1 for error, or configured socket otherwise.  */
+ * @return -1 for error, or configured socket otherwise.  
+ */
 int config_socket() {
 
     int sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -16,28 +41,18 @@ int config_socket() {
         fprintf(stderr, "failed to create socket\n");
         return -1;
     }
-    printf("socket created\n");
 
-    int flag = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof (flag)) == -1) {
+    if (set_reuseaddr(sock) == -1) {
         fprintf(stderr, "can't set SO_REUSEADDR sock option\n");
         close(sock);
         return -1;
     }
-    printf("SO_REUSEADDR socket option set\n");
 
-    long fl = fcntl(sock, F_GETFL);
-    if (fl == -1) {
-        fprintf(stderr, "can't get the socket mode\n");
+    if (set_nonblock(sock) == -1) {
+        fprintf(stderr, "can't set O_NONBLOCK socket access mode\n");
         close(sock);
         return -1;
     }
-    if (fcntl(sock, F_SETFL, fl | O_NONBLOCK) == -1) {
-        fprintf(stderr, "can't set the socket mode O_NONBLOCK\n");
-        close(sock);
-        return -1;
-    }
-    printf("O_NONBLOCK socket access mode set\n");
 
     const short port = 9000;
     struct sockaddr_in sa;
@@ -50,14 +65,12 @@ int config_socket() {
         close(sock);
         return -1;
     }
-    printf("bind succeeded\n");
 
     if (listen(sock, 10) == -1) {
         close(sock);
         fprintf(stderr, "listen failed\n");
         return -1;
     }
-    printf("listen succeeded\n");
 
     return sock;
 }
