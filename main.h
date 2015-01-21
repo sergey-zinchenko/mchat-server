@@ -1,6 +1,6 @@
 /* 
  * File:   main.h
- * Author: user
+ * Author: Sergey Zinchenko
  *
  * Created on January 21, 2015, 12:31 PM
  */
@@ -25,10 +25,9 @@ extern "C" {
 #include <errno.h>
 #include <time.h>
 #include <uuid/uuid.h>
-#include <openssl/evp.h>
-#include <openssl/bio.h>
 #include <json/json.h>
 #include "srvtypes.h"
+#include "base64.h"
     
 #ifdef	__cplusplus
 }

@@ -4,6 +4,7 @@
     <logicalFolder name="HeaderFiles"
                    displayName="Header Files"
                    projectFiles="true">
+      <itemPath>base64.h</itemPath>
       <itemPath>main.h</itemPath>
       <itemPath>srvtypes.h</itemPath>
     </logicalFolder>
@@ -14,6 +15,7 @@
     <logicalFolder name="SourceFiles"
                    displayName="Source Files"
                    projectFiles="true">
+      <itemPath>base64.c</itemPath>
       <itemPath>main.c</itemPath>
     </logicalFolder>
     <logicalFolder name="TestFiles"
@@ -60,6 +62,10 @@
           </linkerLibItems>
         </linkerTool>
       </compileType>
+      <item path="base64.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="base64.h" ex="false" tool="3" flavor2="0">
+      </item>
       <item path="main.c" ex="false" tool="0" flavor2="0">
       </item>
       <item path="main.h" ex="false" tool="3" flavor2="0">
@@ -96,6 +102,10 @@
           </linkerLibItems>
         </linkerTool>
       </compileType>
+      <item path="base64.c" ex="false" tool="0" flavor2="0">
+      </item>
+      <item path="base64.h" ex="false" tool="3" flavor2="0">
+      </item>
       <item path="main.c" ex="false" tool="0" flavor2="0">
       </item>
       <item path="main.h" ex="false" tool="3" flavor2="0">
