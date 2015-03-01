@@ -59,14 +59,6 @@ void client_read_write(EV_P_ struct ev_io *io, int revents) {
                     continue;
                 return;
             } else {
-                ev_io_stop(loop, io);
-                close(io->fd);
-                free(cli_ctx->r_ctx.read_buff);
-                cli_ctx->r_ctx.read_buff = NULL;
-                cli_ctx->r_ctx.read_buff_length = 0;
-                cli_ctx->r_ctx.read_buff_pos = 0;
-                cli_ctx->r_ctx.parser_pos = 0;
-                cli_ctx->r_ctx.prev_parser_pos = 0;
                 char time_buff[32];
                 time_t now = time(NULL);
                 strftime(time_buff, sizeof (time_buff), "%Y-%m-%d %H:%M:%S %Z", localtime(&now));
@@ -74,13 +66,18 @@ void client_read_write(EV_P_ struct ev_io *io, int revents) {
                 char uuid_buff[37];
                 uuid_unparse_lower(cli_ctx->uuid, (char *) &uuid_buff);
                 printf("client closed connection %s:%hu %s at %s\n", addr, cli_ctx->client_addr.sin_port, &uuid_buff, &time_buff);
-                delete_client_ctx(srv_ctx, cli_ctx);
+                close_client(loop, cli_ctx);
                 return;
             }
         }
     }
     if (revents & EV_WRITE) {
-
+        while (1) {
+            write_ctx_t *wctx = &cli_ctx->w_ctx;
+            message_buff_t *buff = &wctx->buffs[0];       
+            ssize_t writed = write(io->fd, &buff->data[buff->data_pos], buff->data_length - buff->data_pos);
+            
+        }
     }
 }
 
