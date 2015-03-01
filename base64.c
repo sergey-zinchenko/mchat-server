@@ -22,7 +22,6 @@ char * base64_encode(const char *data, ssize_t data_len) {
     do {
         if (buff_len - buff_pos < 1024) {
             char *new_buff = realloc(buff, buff_len + 1024);
-            //memset(&new_buff[buff_pos], 0, buff_len + 1024 - buff_pos);
             if (!new_buff) {
                 bout_result = -1;
                 break;

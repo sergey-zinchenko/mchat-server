@@ -25,7 +25,6 @@ static void delete_client_ctx(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
         if (uuid_compare(cli_ctx->uuid, srv_ctx->clients[i]->uuid) == 0) {
             free(cli_ctx);
             memmove(&srv_ctx->clients[i], &srv_ctx->clients[i + 1], sizeof (client_ctx_t *) * (srv_ctx->clients_count - i - 1));
-            memset(&srv_ctx->clients[srv_ctx->clients_count - 1], 0, sizeof(client_ctx_t));
             srv_ctx->clients_count--;
             return;
         }
@@ -77,16 +76,14 @@ void send_message(EV_P_ uuid_t recipient, char *msg, size_t msg_size) {
 static void erase_client(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
 
     free(cli_ctx->r_ctx.read_buff);
-    cli_ctx->r_ctx.read_buff = NULL;
     cli_ctx->r_ctx.read_buff_length = 0;
     cli_ctx->r_ctx.read_buff_pos = 0;
     cli_ctx->r_ctx.parser_pos = 0;
     cli_ctx->r_ctx.prev_parser_pos = 0;
 
-    for (ssize_t i = 0; i < cli_ctx->w_ctx.buffs_length; i++)
+    for (ssize_t i = 0; i < cli_ctx->w_ctx.buffs_count; i++)
         free(cli_ctx->w_ctx.buffs[i].data);
     free(cli_ctx->w_ctx.buffs);
-    cli_ctx->w_ctx.buffs = NULL;
     cli_ctx->w_ctx.buffs_count = 0;
     cli_ctx->w_ctx.buffs_length = 0;
     cli_ctx->writing = 0;

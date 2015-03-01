@@ -91,7 +91,6 @@ void client_read_write(EV_P_ struct ev_io *io, int revents) {
             if (buffs[0].data_pos == buffs[0].data_length) {
                 free(buffs[0].data);
                 memmove(&buffs[0], &buffs[1], sizeof (message_buff_t) * (w_ctx->buffs_count - 1));
-                memset(&buffs[w_ctx->buffs_count - 1], 0, sizeof(message_buff_t));
                 w_ctx->buffs_count--;
             } else {
                 break;
