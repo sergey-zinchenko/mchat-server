@@ -8,7 +8,7 @@
 #include "main.h"
 
 struct ev_loop *init_server_context(int sock) {
-    EV_P = ev_default_loop(EVFLAG_AUTO);
+    struct ev_loop *loop = ev_default_loop(EVFLAG_AUTO);
     if (!loop) {
         fprintf(stderr, "Failed to initialize event loop\n");
         return NULL;
@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
         return (EXIT_FAILURE);
     }
 
-    EV_P = init_server_context(sock);
+    struct ev_loop *loop = init_server_context(sock);
     if (!loop) {
         fprintf(stderr, "failed to initialize event loop and server context\n");
         close(sock);
