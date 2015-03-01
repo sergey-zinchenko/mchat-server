@@ -5,6 +5,8 @@
  * Created on March 2, 2015, 1:21 AM
  */
 
+#include <alloca.h>
+
 #include "sys_messages.h"
 
 char *server_welcome(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
@@ -27,6 +29,7 @@ char *server_welcome(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
     json_object_object_add(obj, "clients", client_list);
     const char *out = json_object_to_json_string(obj);
     char *base64_out = base64_encode(out, strlen(out));
+    json_object_put(obj);
     return base64_out;
 }
 
@@ -40,6 +43,7 @@ static char *server_client_connect_disconnect(client_ctx_t *cli_ctx, const char 
     json_object_object_add(obj, "client", uuid_string);
     const char *out = json_object_to_json_string(obj);
     char *base64_out = base64_encode(out, strlen(out));
+    json_object_put(obj);
     return base64_out;    
 }
 
