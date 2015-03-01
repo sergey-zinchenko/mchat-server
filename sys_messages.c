@@ -29,3 +29,16 @@ char *server_welcome(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
     char *base64_out = base64_encode(out, strlen(out));
     return base64_out;
 }
+
+char *server_client_connected(client_ctx_t *cli_ctx) {
+    json_object *obj = json_object_new_object();
+    json_object *type_string = json_object_new_string("connected");
+    char uuid_buff[37];
+    uuid_unparse_lower(cli_ctx->uuid, (char *) &uuid_buff);
+    json_object *uuid_string = json_object_new_string((char *) &uuid_buff);
+    json_object_object_add(obj, "type", type_string);
+    json_object_object_add(obj, "client", uuid_string);
+    const char *out = json_object_to_json_string(obj);
+    char *base64_out = base64_encode(out, strlen(out));
+    return base64_out;
+}
