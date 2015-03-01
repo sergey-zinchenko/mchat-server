@@ -72,12 +72,40 @@ void client_read_write(EV_P_ struct ev_io *io, int revents) {
         }
     }
     if (revents & EV_WRITE) {
-        while (1) {
-            write_ctx_t *wctx = &cli_ctx->w_ctx;
-            message_buff_t *buff = &wctx->buffs[0];       
-            ssize_t writed = write(io->fd, &buff->data[buff->data_pos], buff->data_length - buff->data_pos);
-            
+        write_ctx_t *w_ctx = &cli_ctx->w_ctx;
+        message_buff_t *buffs = &w_ctx->buffs[0];
+
+        while (w_ctx->buffs_count > 0) {
+            while (buffs[0].data_pos < buffs[0].data_length) {
+                ssize_t writed = write(io->fd, &buffs[0].data[buffs->data_pos], buffs[0].data_length - buffs[0].data_pos);
+                if (writed > 0) {
+                    buffs[0].data_pos += writed;
+                } else {
+                    if (errno == EAGAIN)
+                        break;
+                    if (errno == EINTR)
+                        continue;
+                    break;
+                }
+            }
+            if (buffs[0].data_pos == buffs[0].data_length) {
+                free(buffs[0].data);
+                memmove(&buffs[0], &buffs[1], sizeof (message_buff_t) * (w_ctx->buffs_count - 1));
+                memset(&buffs[w_ctx->buffs_count - 1], 0, sizeof(message_buff_t));
+                w_ctx->buffs_count--;
+            } else {
+                break;
+            }
         }
+        if (w_ctx->buffs_count == 0) {
+            ev_io *io = &cli_ctx->io.io;
+            ev_io_stop(loop, io);
+            ev_io_set(io, io->fd, EV_READ);
+            ev_io_start(loop, io);
+            cli_ctx->writing = 0;
+        }
+
+
     }
 }
 

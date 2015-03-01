@@ -22,7 +22,7 @@ char * base64_encode(const char *data, ssize_t data_len) {
     do {
         if (buff_len - buff_pos < 1024) {
             char *new_buff = realloc(buff, buff_len + 1024);
-            memset(&new_buff[buff_pos], 0, buff_len - buff_pos);
+            //memset(&new_buff[buff_pos], 0, buff_len + 1024 - buff_pos);
             if (!new_buff) {
                 bout_result = -1;
                 break;
@@ -35,6 +35,15 @@ char * base64_encode(const char *data, ssize_t data_len) {
     } while (!BIO_eof(bout));
     BIO_free_all(b64);
     if ((bout_result >= 0)&&(buff_pos > 0)) {
+        if (buff_pos == buff_len) {
+            char *new_buff = realloc(buff, buff_len + 1);
+            if (!new_buff) {
+                free(buff);
+                return NULL;
+            }
+            buff = new_buff;
+        }
+        buff[buff_pos] = '\0';
         return buff;
     } else {
         free(buff);
@@ -68,6 +77,15 @@ char * base64_decode(char *data, ssize_t data_len) {
     } while (!BIO_eof(b64));
     BIO_free_all(b64);
     if ((bio_result >= 0)&&(buff_pos > 0)) {
+        if (buff_pos == buff_len) {
+            char *new_buff = realloc(buff, buff_len + 1);
+            if (!new_buff) {
+                free(buff);
+                return NULL;
+            }
+            buff = new_buff;
+        }
+        buff[buff_pos] = '\0';
         return buff;
     } else {
         free(buff);

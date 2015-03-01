@@ -25,6 +25,7 @@ static void delete_client_ctx(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
         if (uuid_compare(cli_ctx->uuid, srv_ctx->clients[i]->uuid) == 0) {
             free(cli_ctx);
             memmove(&srv_ctx->clients[i], &srv_ctx->clients[i + 1], sizeof (client_ctx_t *) * (srv_ctx->clients_count - i - 1));
+            memset(&srv_ctx->clients[srv_ctx->clients_count - 1], 0, sizeof(client_ctx_t));
             srv_ctx->clients_count--;
             return;
         }
@@ -85,6 +86,7 @@ static void erase_client(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
     for (ssize_t i = 0; i < cli_ctx->w_ctx.buffs_length; i++)
         free(cli_ctx->w_ctx.buffs[i].data);
     free(cli_ctx->w_ctx.buffs);
+    cli_ctx->w_ctx.buffs = NULL;
     cli_ctx->w_ctx.buffs_count = 0;
     cli_ctx->w_ctx.buffs_length = 0;
     cli_ctx->writing = 0;
@@ -98,8 +100,4 @@ void close_client(EV_P_ client_ctx_t *cli_ctx) {
     ev_io_stop(loop, io);
     close(io->fd);
     erase_client(srv_ctx, cli_ctx);
-}
-
-void foo(client_ctx_t *client) {
-
 }
