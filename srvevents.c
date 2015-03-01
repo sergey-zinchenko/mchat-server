@@ -144,6 +144,8 @@ void on_connect(EV_P_ struct ev_io *io, int revents) {
             char uuid_buff[37];
             uuid_unparse_lower(cli_ctx->uuid, (char *) &uuid_buff);
             printf("client accepted %s:%hu %s at %s\n", addr, client_addr.sin_port, &uuid_buff, &time_buff);
+            char *welcome = server_welcome(srv_ctx, cli_ctx);
+            send_message(loop, cli_ctx->uuid, welcome, strlen(welcome));
         } else {
             if (errno == EAGAIN)
                 return;

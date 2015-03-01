@@ -40,7 +40,8 @@ OBJECTFILES= \
 	${OBJECTDIR}/srvclientutils.o \
 	${OBJECTDIR}/srvcore.o \
 	${OBJECTDIR}/srvevents.o \
-	${OBJECTDIR}/srvsockutils.o
+	${OBJECTDIR}/srvsockutils.o \
+	${OBJECTDIR}/sys_messages.o
 
 
 # C Compiler Flags
@@ -96,6 +97,11 @@ ${OBJECTDIR}/srvsockutils.o: srvsockutils.c
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.c) -O2 -std=c99 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/srvsockutils.o srvsockutils.c
+
+${OBJECTDIR}/sys_messages.o: sys_messages.c 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.c) -O2 -std=c99 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/sys_messages.o sys_messages.c
 
 # Subprojects
 .build-subprojects:

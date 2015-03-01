@@ -30,6 +30,8 @@ extern "C" {
 #include "srvsockutils.h"
 #include "srvclientutils.h"
 #include "base64.h"
+#include "sys_messages.h"
+#include "srvclientutils.h"
 
     void client_read_write(EV_P_ struct ev_io *io, int revents);
     void on_connect(EV_P_ struct ev_io *io, int revents);
