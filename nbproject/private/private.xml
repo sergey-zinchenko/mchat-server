@@ -7,6 +7,10 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
+            <file>file:/home/user/NetBeansProjects/mchat-server/srvsockutils.c</file>
+            <file>file:/home/user/NetBeansProjects/mchat-server/srvcore.c</file>
+            <file>file:/home/user/NetBeansProjects/mchat-server/srvclientutils.c</file>
+            <file>file:/home/user/NetBeansProjects/mchat-server/base64.c</file>
             <file>file:/home/user/NetBeansProjects/mchat-server/main.c</file>
         </group>
     </open-files>

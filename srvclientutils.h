@@ -21,7 +21,7 @@ extern "C" {
     
 client_ctx_t* get_client_ctx(server_ctx_t *srv_ctx);
 void delete_client_ctx(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx);
-void add_message_to_send(client_ctx_t *cli_ctx, char *msg, size_t msg_size);
+void send_message(EV_P_ uuid_t recipient, char *msg, size_t msg_size);
 
 #ifdef	__cplusplus
 }

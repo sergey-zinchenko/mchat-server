@@ -31,15 +31,46 @@ void delete_client_ctx(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx) {
     }
 }
 
-void add_message_to_send(client_ctx_t *cli_ctx, char *msg, size_t msg_size) {
-   if (cli_ctx->w_ctx.buffs_count == cli_ctx->w_ctx.buffs_length) {
+static int add_message_to_send(client_ctx_t *cli_ctx, char *msg, size_t msg_size) {
+    if (cli_ctx->w_ctx.buffs_count == cli_ctx->w_ctx.buffs_length) {
         message_buff_t *reallocated = (message_buff_t *) realloc(cli_ctx->w_ctx.buffs, (cli_ctx->w_ctx.buffs_length + 8) * sizeof (message_buff_t));
         if (!reallocated) {
             fprintf(stderr, "failed to reallocate buffers list");
-            return;
+            return -1;
         }
         cli_ctx->w_ctx.buffs = reallocated;
         cli_ctx->w_ctx.buffs_length += 8;
+
     }
-    cli_ctx->w_ctx.buffs[(cli_ctx->w_ctx.buffs_count)++];    
+    cli_ctx->w_ctx.buffs_count++;
+    cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data = malloc(msg_size);
+    if (!cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data) {
+        cli_ctx->w_ctx.buffs_count--;
+        fprintf(stderr, "failed to allocate buffer for message");
+        return -1;
+    }
+    memcpy(cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data, msg, msg_size);
+    return 0;
+}
+
+void send_message(EV_P_ uuid_t recipient, char *msg, size_t msg_size) {
+    server_ctx_t *srv_ctx = (server_ctx_t *) ev_userdata(loop);
+    for (ssize_t j = 0; j < srv_ctx->clients_count; j++) {
+        if (uuid_compare(recipient, srv_ctx->clients[j]->uuid) == 0) {
+            if (add_message_to_send(srv_ctx->clients[j], msg, msg_size) == 0) {
+                if (srv_ctx->clients[j]->writing == 0) {
+                    ev_io *io = (ev_io *)&srv_ctx->clients[j]->io;
+                    ev_io_stop(loop, io);
+                    ev_io_set(io, io->fd, EV_READ|EV_WRITE);
+                    ev_io_start(loop, io);
+                    srv_ctx->clients[j]->writing = 1;
+                }
+            }
+            break;
+        }
+    }
+}
+
+void message_sent(client_ctx_t *client) {
+    
 }

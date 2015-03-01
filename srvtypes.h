@@ -55,6 +55,7 @@ struct client_ctx_t {
     io_with_cctx_t io;
     struct sockaddr_in client_addr;
     time_t connected_at;
+    int writing;
     write_ctx_t w_ctx;
     read_ctx_t r_ctx;
 };

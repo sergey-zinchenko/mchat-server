@@ -98,7 +98,7 @@ int config_socket() {
  */
 void shutdown_printerr(int sock, char *msg) {
     if (msg)
-        fprintf(stderr, msg);
+        fprintf(stderr, "%s", msg);
     shutdown(sock, SHUT_RDWR);
     close(sock);
 }

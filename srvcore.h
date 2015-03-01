@@ -17,6 +17,7 @@ extern "C" {
     #include <json/json.h>
     #include "srvtypes.h"
     #include "base64.h"
+    #include "srvclientutils.h"
 
     void process_client_msg(EV_P_ server_ctx_t *srv_ctx, client_ctx_t *cli_ctx, char *msg);
 
