@@ -41,7 +41,6 @@ void process_client_msg(EV_P_ server_ctx_t *srv_ctx, client_ctx_t *cli_ctx, char
             json_object_object_add(msg_obj, "from", from_obj);
             const char *out = json_object_to_json_string(msg_obj);
             char *base64_out = base64_encode(out, strlen(out));
-            
             if (to_array_real_count > 0) {
                 for (int i = 0; i < to_array_real_count; i++) {
                     if (uuid_is_null(uuids_to[i]) == 1)

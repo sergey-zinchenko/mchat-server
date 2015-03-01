@@ -43,13 +43,15 @@ static int add_message_to_send(client_ctx_t *cli_ctx, char *msg, size_t msg_size
 
     }
     
-    cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data = malloc(msg_size);
+    cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data = malloc(msg_size + 2); // for "\r" and "\n"
     if (!cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data) {
         fprintf(stderr, "failed to allocate buffer for message");
         return -1;
     }
     memcpy(cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data, msg, msg_size);
-    cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data_length = msg_size;
+    cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data[msg_size] = '\r';
+    cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data[msg_size + 1] = '\n';
+    cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data_length = msg_size + 2;
     cli_ctx->w_ctx.buffs[cli_ctx->w_ctx.buffs_count].data_pos = 0;
     cli_ctx->w_ctx.buffs_count++;
     return 0;

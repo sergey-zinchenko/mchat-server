@@ -66,6 +66,13 @@ void client_read_write(EV_P_ struct ev_io *io, int revents) {
                 char uuid_buff[37];
                 uuid_unparse_lower(cli_ctx->uuid, (char *) &uuid_buff);
                 printf("client closed connection %s:%hu %s at %s\n", addr, cli_ctx->client_addr.sin_port, &uuid_buff, &time_buff);
+                char *disconnected_client_msg = server_client_disconnected(cli_ctx);
+                for (ssize_t i = 0; i < srv_ctx->clients_count; i++) {
+                    if (uuid_compare(srv_ctx->clients[i]->uuid, cli_ctx->uuid) != 0) {
+                        send_message(loop, srv_ctx->clients[i]->uuid, disconnected_client_msg, strlen(disconnected_client_msg));
+                    }
+                }
+                free(disconnected_client_msg);
                 close_client(loop, cli_ctx);
                 return;
             }

@@ -19,6 +19,7 @@ extern "C" {
     
     char *server_welcome(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx);
     char *server_client_connected(client_ctx_t *cli_ctx);
+    char *server_client_disconnected(client_ctx_t *cli_ctx);
 
 #ifdef	__cplusplus
 }
