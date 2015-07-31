@@ -25,7 +25,7 @@ extern "C" {
 #include <errno.h>
 #include <time.h>
 #include <uuid/uuid.h>
-#include <json/json.h>
+#include <json-c/json.h>
 #include "srvtypes.h"
 #include "srvsockutils.h"
 #include "srvclientutils.h"

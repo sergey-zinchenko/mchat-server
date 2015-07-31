@@ -14,7 +14,7 @@ extern "C" {
 
     #include <ev.h>
     #include <uuid/uuid.h>
-    #include <json/json.h>
+    #include <json-c/json.h>
     #include "srvtypes.h"
     #include "base64.h"
     #include "srvclientutils.h"
