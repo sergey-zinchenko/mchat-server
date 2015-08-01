@@ -15,7 +15,7 @@ extern "C" {
 #include "srvtypes.h"
 #include "base64.h"
 #include <uuid/uuid.h>
-#include <json/json.h>
+#include <json-c/json.h>
     
     char *server_welcome(server_ctx_t *srv_ctx, client_ctx_t *cli_ctx);
     char *server_client_connected(client_ctx_t *cli_ctx);
