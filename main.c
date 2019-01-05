@@ -21,7 +21,7 @@ struct ev_loop *init_server_context(int sock) {
     srv_ctx->started_at = time(NULL);
     srv_ctx->clients_size = 64;
     srv_ctx->clients = (client_ctx_t **) calloc(srv_ctx->clients_size, sizeof (client_ctx_t *));
-    if (!srv_ctx) {
+    if (!srv_ctx->clients) {
        fprintf(stderr, "Failed to allocate list of clients context\n"); 
        free(srv_ctx);
        return NULL;
